@@ -6,7 +6,7 @@ from flask import jsonify  # übersetzt python-dicts in json
 from flask import g
 import sqlite3
 
-DATABASE = '/Users/sven.d2/Desktop/tischreservierung-o/database.db'
+DATABASE = '/Users/sven.d2/Desktop/2023.09.26_tisch_reservierung/tischreservierung-o/database.db'
 app = flask.Flask(__name__)
 app.config["DEBUG"] = True  # Zeigt Fehlerinformationen im Browser, statt nur einer generischen Error-Message
 
@@ -26,10 +26,6 @@ def close_connection(exception):
         db.close()
 
 
-def to_date(date_string):
-    return datetime.strptime(date_string, '%Y-%m-%d-%H-%M')
-
-
 @app.route('/', methods=['GET'])
 def home():
     return "<h1>Tischreservierung</h1>"
@@ -39,14 +35,22 @@ def home():
 def get_tables():
     query_parameters = request.args
 
-    start = query_parameters.get('start', default=datetime.now(), type=to_date)
-    end = query_parameters.get('end', default=datetime.now(), type=to_date)
+    start = query_parameters.get('start')
+    end = query_parameters.get('end')
 
-    tables = get_db().execute('SELECT * FROM tische;').fetchall()
-    reservations = get_db().execute('SELECT * FROM reservierungen;').fetchall()
+    if start is None:
+        start = datetime.min.strftime('%Y-%m-%d %H:%M:%S')
 
-    return jsonify({'start': start.isoformat(), 'end': end.isoformat(), 'tables': tables,
-                    'reservations': reservations})
+    if end is None:
+        end = datetime.max.strftime('%Y-%m-%d %H:%M:%S')
+
+    reservations = get_db().execute('''
+        SELECT tische.tischnummer, tische.anzahlPlaetze, reservierungen.zeitpunkt FROM tische 
+        LEFT JOIN reservierungen ON tische.tischnummer = reservierungen.tischnummer 
+        WHERE (zeitpunkt >= ? AND zeitpunkt <= ?) AND storniert is FALSE;
+        ''', [start, end]).fetchall()
+
+    return jsonify({'tables': reservations})
 
 
 app.run(port=3001)
