@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import flask
 from flask import request  # wird benötigt, um die HTTP-Parameter abzufragen
@@ -35,20 +35,19 @@ def home():
 def get_tables():
     query_parameters = request.args
 
-    start = query_parameters.get('start')
-    end = query_parameters.get('end')
+    time = query_parameters.get('time')
 
-    if start is None:
-        start = datetime.min.strftime('%Y-%m-%d %H:%M:%S')
+    if time is None:
+        time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-    if end is None:
-        end = datetime.max.strftime('%Y-%m-%d %H:%M:%S')
+    end = (datetime.strptime(time, '%Y-%m-%d %H:%M:%S') + timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S')
 
     reservations = get_db().execute('''
-        SELECT tische.tischnummer, tische.anzahlPlaetze, reservierungen.zeitpunkt FROM tische 
-        LEFT JOIN reservierungen ON tische.tischnummer = reservierungen.tischnummer 
-        WHERE (zeitpunkt BETWEEN ? AND ?) AND storniert is FALSE;
-        ''', [start, end]).fetchall()
+        SELECT tische.tischnummer, tische.anzahlPlaetze FROM tische 
+        WHERE tischnummer NOT IN (SELECT reservierungen.tischnummer FROM reservierungen 
+        WHERE (reservierungen.zeitpunkt BETWEEN ? AND ?) 
+        AND reservierungen.storniert IS FALSE);
+        ''', [time, end]).fetchall()
 
     return jsonify({'tables': reservations})
 
