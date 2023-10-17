@@ -47,7 +47,7 @@ def get_tables():
     reservations = get_db().execute('''
         SELECT tische.tischnummer, tische.anzahlPlaetze, reservierungen.zeitpunkt FROM tische 
         LEFT JOIN reservierungen ON tische.tischnummer = reservierungen.tischnummer 
-        WHERE (zeitpunkt >= ? AND zeitpunkt <= ?) AND storniert is FALSE;
+        WHERE (zeitpunkt BETWEEN ? AND ?) AND storniert is FALSE;
         ''', [start, end]).fetchall()
 
     return jsonify({'tables': reservations})
