@@ -31,7 +31,7 @@ def home():
     return "<h1>Tischreservierung</h1>"
 
 
-@app.route('/tables', methods=['GET'])
+@app.route('/api/v1/tables', methods=['GET'])
 def get_tables():
     query_parameters = request.args
 

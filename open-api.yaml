@@ -1,0 +1,27 @@
+openapi: 3.0.3
+info:
+  title: Tischreservierung API
+  version: 0.1.0
+paths:
+  /api/v1/tables:
+    get:
+      tags:
+        - Tische
+      summary: 'Verfügbare Tische zu bestimmten Zeitpunkt abfragen'
+      description: 'Returns Liste aller verfügbaren Tische'
+      operationId: tables
+      parameters:
+        - name: time
+          in: query
+          description: Zeitpunkt, ab dem ein Tisch gewünscht ist
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: array
+                items: # ?
