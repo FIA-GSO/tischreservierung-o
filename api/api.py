@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
 import flask
-from flask import request  # wird benötigt, um die HTTP-Parameter abzufragen
+from flask import request, Flask  # wird benötigt, um die HTTP-Parameter abzufragen
 from flask import jsonify  # übersetzt python-dicts in json
 from flask import g
 import sqlite3
@@ -11,45 +11,53 @@ app = flask.Flask(__name__)
 app.config["DEBUG"] = True  # Zeigt Fehlerinformationen im Browser, statt nur einer generischen Error-Message
 
 
-def get_db():
-    db = getattr(g, '_database', None)
-    if db is None:
-        db = g._database = sqlite3.connect(DATABASE)
+def init_app(app):
+    def get_db():
+        db = getattr(g, '_database', None)
+        if db is None:
+            db = g._database = sqlite3.connect(DATABASE)
 
-    return db
+        return db
 
+    @app.teardown_appcontext
+    def close_connection(exception):
+        db = getattr(g, '_database', None)
+        if db is not None:
+            db.close()
 
-@app.teardown_appcontext
-def close_connection(exception):
-    db = getattr(g, '_database', None)
-    if db is not None:
-        db.close()
+    @app.route('/', methods=['GET'])
+    def home():
+        return "<h1>Tischreservierung</h1>"
 
+    @app.route('/api/v1/tables', methods=['GET'])
+    def get_tables():
+        query_parameters = request.args
 
-@app.route('/', methods=['GET'])
-def home():
-    return "<h1>Tischreservierung</h1>"
+        time = query_parameters.get('time')
 
+        if time is None:
+            time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-@app.route('/api/v1/tables', methods=['GET'])
-def get_tables():
-    query_parameters = request.args
+        end = (datetime.strptime(time, '%Y-%m-%d %H:%M:%S') + timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S')
 
-    time = query_parameters.get('time')
+        reservations = get_db().execute('''
+            SELECT tische.tischnummer, tische.anzahlPlaetze FROM tische 
+            WHERE tischnummer NOT IN (SELECT reservierungen.tischnummer FROM reservierungen 
+            WHERE (reservierungen.zeitpunkt BETWEEN ? AND ?) 
+            AND reservierungen.storniert IS FALSE);
+            ''', [time, end]).fetchall()
 
-    if time is None:
-        time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
-    end = (datetime.strptime(time, '%Y-%m-%d %H:%M:%S') + timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S')
-
-    reservations = get_db().execute('''
-        SELECT tische.tischnummer, tische.anzahlPlaetze FROM tische 
-        WHERE tischnummer NOT IN (SELECT reservierungen.tischnummer FROM reservierungen 
-        WHERE (reservierungen.zeitpunkt BETWEEN ? AND ?) 
-        AND reservierungen.storniert IS FALSE);
-        ''', [time, end]).fetchall()
-
-    return jsonify({'tables': reservations})
+        return jsonify({'tables': reservations})
 
 
-app.run(port=3001)
+def create_app():  # Factory Pattern
+    app = Flask(__name__)
+
+    init_app(app)  # Fügt app die Route für hello_world hinzu
+
+    return app
+
+
+if __name__ == "__main__":
+    app = create_app()
+    app.run()
